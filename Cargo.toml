@@ -1,0 +1,23 @@
+[package]
+name = "actix-bincode"
+version = "0.1.0"
+authors = ["Dany Laporte <dany.laporte@hotmail.com>"]
+edition = "2018"
+description = "Bincode support for Actix-Web"
+readme = "README.md"
+repository = "https://github.com/danylaporte/actix-bincode"
+keywords = ["serde", "actix", "bincode", "web", "async"]
+categories = ["encoding", "web-programming", "asynchronous"]
+publish = false
+
+[dependencies]
+actix-http = "^2"
+actix-web = { version = "^3", default-features = false }
+bincode = "^1"
+futures-util = "0.3.5"
+log = "0.4"
+serde = "^1"
+
+[dev-dependencies]
+actix-rt = "^1"
+serde = { version = "^1", features = ["derive"] }
