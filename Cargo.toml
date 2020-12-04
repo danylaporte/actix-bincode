@@ -11,13 +11,13 @@ categories = ["encoding", "web-programming", "asynchronous"]
 publish = false
 
 [dependencies]
-actix-http = "^2"
-actix-web = { version = "^3", default-features = false }
-bincode = "^1"
+actix-http = "2"
+actix-web = { version = "3", default-features = false }
+bincode = "1"
 futures-util = "0.3.5"
 log = "0.4"
-serde = "^1"
+serde = "1"
 
 [dev-dependencies]
-actix-rt = "^1"
-serde = { version = "^1", features = ["derive"] }
+actix-rt = "1"
+serde = { version = "1", features = ["derive"] }
