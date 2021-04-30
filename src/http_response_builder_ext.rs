@@ -1,4 +1,4 @@
-use actix_web::{dev::BaseHttpResponseBuilder, http::header::ContentType, HttpResponse};
+use actix_web::{http::header::ContentType, HttpResponse, HttpResponseBuilder};
 use serde::Serialize;
 use tracing::error;
 
@@ -15,7 +15,7 @@ pub trait HttpResponseBuilderExt {
     fn bincode2<T: Serialize>(&mut self, value: &T) -> HttpResponse;
 }
 
-impl HttpResponseBuilderExt for BaseHttpResponseBuilder {
+impl HttpResponseBuilderExt for HttpResponseBuilder {
     fn bincode<T: Serialize>(&mut self, value: T) -> HttpResponse {
         self.bincode2(&value)
     }
