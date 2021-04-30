@@ -1,5 +1,4 @@
-use actix_http::{error::PayloadError, http::StatusCode, ResponseError};
-use actix_web::HttpResponse;
+use actix_web::{error::PayloadError, http::StatusCode, BaseHttpResponse, ResponseError};
 use std::{error::Error, fmt};
 
 #[derive(Debug)]
@@ -48,10 +47,10 @@ impl Error for BincodePayloadError {}
 
 /// Return `BadRequest` for `BincodePayloadError`
 impl ResponseError for BincodePayloadError {
-    fn error_response(&self) -> HttpResponse {
+    fn error_response(&self) -> BaseHttpResponse<actix_web::dev::Body> {
         match *self {
-            Self::Overflow => HttpResponse::new(StatusCode::PAYLOAD_TOO_LARGE),
-            _ => HttpResponse::new(StatusCode::BAD_REQUEST),
+            Self::Overflow => BaseHttpResponse::new(StatusCode::PAYLOAD_TOO_LARGE),
+            _ => BaseHttpResponse::new(StatusCode::BAD_REQUEST),
         }
     }
 }

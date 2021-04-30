@@ -1,6 +1,7 @@
 use crate::BincodePayloadError;
-use actix_http::{http::header::CONTENT_LENGTH, HttpMessage, Payload};
-use actix_web::{web::BytesMut, HttpRequest};
+use actix_web::{
+    dev::Payload, http::header::CONTENT_LENGTH, web::BytesMut, HttpMessage, HttpRequest,
+};
 use futures_util::{
     future::{FutureExt, LocalBoxFuture},
     StreamExt,

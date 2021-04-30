@@ -1,9 +1,11 @@
 use super::*;
-use actix_http::body::Body;
-use actix_web::error::InternalError;
-use actix_web::http::header::{self, HeaderValue, CONTENT_LENGTH, CONTENT_TYPE};
-use actix_web::test::{load_stream, TestRequest};
-use actix_web::{web, HttpResponse};
+use actix_web::web;
+use actix_web::{
+    body::Body,
+    http::header::{self, ContentType, HeaderValue},
+};
+use actix_web::{http::header::CONTENT_LENGTH, test::TestRequest};
+use mime::{TEXT_HTML, TEXT_PLAIN};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 struct MyObject {
@@ -62,44 +64,9 @@ async fn test_responder() {
 }
 
 #[actix_rt::test]
-async fn test_custom_error_responder() {
-    let (req, mut pl) = TestRequest::default()
-        .header(
-            header::CONTENT_TYPE,
-            header::HeaderValue::from_static("application/bincode"),
-        )
-        .header(
-            header::CONTENT_LENGTH,
-            header::HeaderValue::from_static("16"),
-        )
-        .set_payload(get_test_bytes())
-        .app_data(BincodeConfig::default().limit(10).error_handler(|err, _| {
-            let msg = MyObject::default();
-            let resp = HttpResponse::BadRequest().body(bincode::serialize(&msg).unwrap());
-            InternalError::from_response(err, resp).into()
-        }))
-        .to_http_parts();
-
-    let s = Bincode::<MyObject>::from_request(&req, &mut pl).await;
-    let mut resp = Response::from_error(s.err().unwrap());
-    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
-
-    let body = load_stream(resp.take_body()).await.unwrap();
-    let msg: MyObject = bincode::deserialize(&body).unwrap();
-    assert_eq!(msg.name, "test");
-}
-
-#[actix_rt::test]
 async fn test_extract() {
     let (req, mut pl) = TestRequest::default()
-        .header(
-            header::CONTENT_TYPE,
-            header::HeaderValue::from_static("application/bincode"),
-        )
-        .header(
-            header::CONTENT_LENGTH,
-            header::HeaderValue::from_static("16"),
-        )
+        .insert_header(ContentType("application/bincode".parse().unwrap()))
         .set_payload(get_test_bytes())
         .to_http_parts();
 
@@ -110,14 +77,7 @@ async fn test_extract() {
     assert_eq!(s.into_inner(), MyObject::default());
 
     let (req, mut pl) = TestRequest::default()
-        .header(
-            header::CONTENT_TYPE,
-            header::HeaderValue::from_static("application/bincode"),
-        )
-        .header(
-            header::CONTENT_LENGTH,
-            header::HeaderValue::from_static("16"),
-        )
+        .insert_header(ContentType("application/bincode".parse().unwrap()))
         .set_payload(get_test_bytes())
         .app_data(BincodeConfig::default().limit(10))
         .to_http_parts();
@@ -126,14 +86,7 @@ async fn test_extract() {
     assert!(format!("{}", s.err().unwrap()).contains("Bincode payload size is bigger than allowed"));
 
     let (req, mut pl) = TestRequest::default()
-        .header(
-            header::CONTENT_TYPE,
-            header::HeaderValue::from_static("application/bincode"),
-        )
-        .header(
-            header::CONTENT_LENGTH,
-            header::HeaderValue::from_static("16"),
-        )
+        .insert_header(ContentType("application/bincode".parse().unwrap()))
         .set_payload(get_test_bytes())
         .app_data(
             BincodeConfig::default()
@@ -156,10 +109,7 @@ async fn test_bincode_body() {
     ));
 
     let (req, mut pl) = TestRequest::default()
-        .header(
-            header::CONTENT_TYPE,
-            header::HeaderValue::from_static("application/text"),
-        )
+        .insert_header(ContentType(("application/test").parse().unwrap()))
         .to_http_parts();
 
     let bc = BincodeBody::<MyObject>::new(&req, &mut pl, None).await;
@@ -170,14 +120,8 @@ async fn test_bincode_body() {
     ));
 
     let (req, mut pl) = TestRequest::default()
-        .header(
-            header::CONTENT_TYPE,
-            header::HeaderValue::from_static("application/bincode"),
-        )
-        .header(
-            header::CONTENT_LENGTH,
-            header::HeaderValue::from_static("10000"),
-        )
+        .insert_header(ContentType("application/bincode".parse().unwrap()))
+        .insert_header((CONTENT_LENGTH, HeaderValue::from_static("10000")))
         .to_http_parts();
 
     let bc = BincodeBody::<MyObject>::new(&req, &mut pl, None)
@@ -187,14 +131,7 @@ async fn test_bincode_body() {
     assert!(bincode_eq(bc.err().unwrap(), BincodePayloadError::Overflow));
 
     let (req, mut pl) = TestRequest::default()
-        .header(
-            header::CONTENT_TYPE,
-            header::HeaderValue::from_static("application/bincode"),
-        )
-        .header(
-            header::CONTENT_LENGTH,
-            header::HeaderValue::from_static("16"),
-        )
+        .insert_header(ContentType("application/bincode".parse().unwrap()))
         .set_payload(get_test_bytes())
         .to_http_parts();
 
@@ -204,17 +141,11 @@ async fn test_bincode_body() {
 
 #[actix_rt::test]
 async fn test_with_bincode_and_bad_content_type() {
-    let (req, mut pl) = TestRequest::with_header(
-        header::CONTENT_TYPE,
-        header::HeaderValue::from_static("text/plain"),
-    )
-    .header(
-        header::CONTENT_LENGTH,
-        header::HeaderValue::from_static("16"),
-    )
-    .set_payload(get_test_bytes())
-    .app_data(BincodeConfig::default().limit(4096))
-    .to_http_parts();
+    let (req, mut pl) = TestRequest::default()
+        .insert_header(ContentType(TEXT_PLAIN))
+        .set_payload(get_test_bytes())
+        .app_data(BincodeConfig::default().limit(4096))
+        .to_http_parts();
 
     let s = Bincode::<MyObject>::from_request(&req, &mut pl).await;
     assert!(s.is_err())
@@ -222,17 +153,11 @@ async fn test_with_bincode_and_bad_content_type() {
 
 #[actix_rt::test]
 async fn test_with_bincode_and_good_custom_content_type() {
-    let (req, mut pl) = TestRequest::with_header(
-        header::CONTENT_TYPE,
-        header::HeaderValue::from_static("text/plain"),
-    )
-    .header(
-        header::CONTENT_LENGTH,
-        header::HeaderValue::from_static("16"),
-    )
-    .set_payload(get_test_bytes())
-    .app_data(BincodeConfig::default().content_type_raw(|mime: &str| mime == "text/plain"))
-    .to_http_parts();
+    let (req, mut pl) = TestRequest::default()
+        .insert_header(ContentType(TEXT_PLAIN))
+        .set_payload(get_test_bytes())
+        .app_data(BincodeConfig::default().content_type_raw(|mime: &str| mime == "text/plain"))
+        .to_http_parts();
 
     let s = Bincode::<MyObject>::from_request(&req, &mut pl).await;
     assert!(s.is_ok())
@@ -240,17 +165,11 @@ async fn test_with_bincode_and_good_custom_content_type() {
 
 #[actix_rt::test]
 async fn test_with_bincode_and_bad_custom_content_type() {
-    let (req, mut pl) = TestRequest::with_header(
-        header::CONTENT_TYPE,
-        header::HeaderValue::from_static("text/html"),
-    )
-    .header(
-        header::CONTENT_LENGTH,
-        header::HeaderValue::from_static("16"),
-    )
-    .set_payload(get_test_bytes())
-    .app_data(BincodeConfig::default().content_type_raw(|mime: &str| mime == "text/plain"))
-    .to_http_parts();
+    let (req, mut pl) = TestRequest::default()
+        .insert_header(ContentType(TEXT_HTML))
+        .set_payload(get_test_bytes())
+        .app_data(BincodeConfig::default().content_type_raw(|mime: &str| mime == "text/plain"))
+        .to_http_parts();
 
     let s = Bincode::<MyObject>::from_request(&req, &mut pl).await;
     assert!(s.is_err())
@@ -259,11 +178,7 @@ async fn test_with_bincode_and_bad_custom_content_type() {
 #[actix_rt::test]
 async fn test_with_config_in_data_wrapper() {
     let (req, mut pl) = TestRequest::default()
-        .header(
-            CONTENT_TYPE,
-            HeaderValue::from_static("application/bincode"),
-        )
-        .header(CONTENT_LENGTH, HeaderValue::from_static("16"))
+        .insert_header(ContentType("application/bincode".parse().unwrap()))
         .set_payload(get_test_bytes())
         .app_data(web::Data::new(BincodeConfig::default().limit(10)))
         .to_http_parts();

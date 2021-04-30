@@ -1,6 +1,6 @@
-use actix_web::{dev::HttpResponseBuilder, HttpResponse};
-use log::error;
+use actix_web::{dev::BaseHttpResponseBuilder, http::header::ContentType, HttpResponse};
 use serde::Serialize;
+use tracing::error;
 
 /// Allow to serialize in bincode on the `HttpResponseBuilder`.
 pub trait HttpResponseBuilderExt {
@@ -15,7 +15,7 @@ pub trait HttpResponseBuilderExt {
     fn bincode2<T: Serialize>(&mut self, value: &T) -> HttpResponse;
 }
 
-impl HttpResponseBuilderExt for HttpResponseBuilder {
+impl HttpResponseBuilderExt for BaseHttpResponseBuilder {
     fn bincode<T: Serialize>(&mut self, value: T) -> HttpResponse {
         self.bincode2(&value)
     }
@@ -23,8 +23,8 @@ impl HttpResponseBuilderExt for HttpResponseBuilder {
     fn bincode2<T: Serialize>(&mut self, value: &T) -> HttpResponse {
         match bincode::serialize(value) {
             Ok(body) => {
-                self.header(actix_web::http::header::CONTENT_TYPE, "application/bincode");
-                self.body(actix_web::dev::Body::from(body))
+                self.insert_header(ContentType("application/bincode".parse().unwrap()));
+                self.body(actix_web::dev::Body::from(body)).into()
             }
             Err(e) => {
                 error!("Serialize error: {}", e);

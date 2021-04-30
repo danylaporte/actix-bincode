@@ -24,12 +24,10 @@
 #[macro_use]
 extern crate serde;
 
-use actix_http::{http::StatusCode, Payload, PayloadStream, Response};
-use actix_web::{FromRequest, HttpRequest, Responder};
-use futures_util::{
-    future::{err, ok, LocalBoxFuture, Ready},
-    FutureExt,
+use actix_web::{
+    dev::Payload, http::StatusCode, FromRequest, HttpRequest, HttpResponse, Responder,
 };
+use futures_util::{future::LocalBoxFuture, FutureExt};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
     fmt,
@@ -112,18 +110,24 @@ impl<T> Responder for Bincode<T>
 where
     T: Serialize,
 {
-    type Error = BincodeError;
-    type Future = Ready<Result<Response, Self::Error>>;
-
-    fn respond_to(self, _: &HttpRequest) -> Self::Future {
+    fn respond_to(self, req: &HttpRequest) -> HttpResponse {
         let body = match bincode::serialize(&self.0) {
             Ok(body) => body,
-            Err(e) => return err(e.into()),
+            Err(e) => {
+                tracing::error!(
+                    "Failed to serialize to Bincode. \
+                     Request path: {} \
+                     {}",
+                    req.path(),
+                    e,
+                );
+                return HttpResponse::InternalServerError().body("Internal Server Error");
+            }
         };
 
-        ok(Response::build(StatusCode::OK)
+        HttpResponse::build(StatusCode::OK)
             .content_type("application/bincode")
-            .body(body))
+            .body(body)
     }
 }
 
@@ -135,7 +139,7 @@ where
     type Future = LocalBoxFuture<'static, Result<Self, Self::Error>>;
     type Config = BincodeConfig;
 
-    fn from_request(req: &HttpRequest, payload: &mut Payload<PayloadStream>) -> Self::Future {
+    fn from_request(req: &HttpRequest, payload: &mut Payload) -> Self::Future {
         let req2 = req.clone();
         let config = BincodeConfig::from_req(req);
 
@@ -147,7 +151,7 @@ where
             .limit(limit)
             .map(move |res| match res {
                 Err(e) => {
-                    log::debug!(
+                    tracing::debug!(
                         "Failed to deserialize Bincode from payload. \
                          Request path: {}",
                         req2.path()
